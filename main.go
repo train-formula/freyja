@@ -1,4 +1,4 @@
-package freyja
+package main
 
 import (
 	"fmt"
@@ -20,7 +20,7 @@ var ServerCmd = &cobra.Command{
 		fastServer := &fasthttp.Server{
 			Handler: fastHTTPHandler,
 			Name:    "apollo",
-			//Handler: s3APiHandler(bucket),
+			//Handler: s3APiHandler(Bucket),
 			GetOnly: true,
 			DisableHeaderNamesNormalizing: true,
 			DisableKeepalive:              true,

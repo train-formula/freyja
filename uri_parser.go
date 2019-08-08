@@ -1,4 +1,4 @@
-package freyja
+package main
 
 import (
 	"bytes"
@@ -7,9 +7,9 @@ import (
 
 
 type ParsedURI struct {
-	bucket []byte
-	bucketPath []byte
-	opts Opts
+	Bucket     []byte
+	BucketPath []byte
+	Opts       Opts
 }
 
 
@@ -22,17 +22,24 @@ var slashBytes = []byte("/")
 
 func parseURI (uri []byte, validBuckets [][]byte, defaultQuality uint32) (parsed ParsedURI, respStatus int) {
 
-	split := bytes.SplitN(uri, slashBytes, 3)
+	idxModifier := 0
+	if bytes.HasPrefix(uri, slashBytes) {
+		idxModifier += 1
+	}
 
-	if len(split) != 3 {
+	split := bytes.SplitN(uri, slashBytes, 3+idxModifier)
+
+	if len(split) != 3+idxModifier {
 		// Split should be exactly 3 always if its valid
 
 		return ParsedURI{}, fasthttp.StatusBadRequest
 	}
 
-	opts := split[0]
-	bucket := split[1]
-	bucketPath := split[2]
+
+	opts := split[0+idxModifier]
+	bucket := split[1+idxModifier]
+	bucketPath := split[2+idxModifier]
+
 
 	if len(validBuckets) == 0 {
 		return ParsedURI{}, fasthttp.StatusBadRequest
@@ -77,9 +84,9 @@ func parseURI (uri []byte, validBuckets [][]byte, defaultQuality uint32) (parsed
 
 
 	return ParsedURI{
-		bucket: bucket,
-		bucketPath: bucketPath,
-		opts: parsedOpts,
+		Bucket:     bucket,
+		BucketPath: bucketPath,
+		Opts:       parsedOpts,
 	}, fasthttp.StatusOK
 
 }

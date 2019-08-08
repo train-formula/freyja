@@ -1,4 +1,4 @@
-package freyja
+package main
 
 import (
 	"bytes"
@@ -7,9 +7,9 @@ import (
 )
 
 type Opts struct {
-	width uint32
-	height uint32
-	quality uint32
+	Width   uint32
+	Height  uint32
+	Quality uint32
 }
 
 const maxQuality = 100
@@ -54,7 +54,7 @@ func parseOpts(opts []byte, defaultQuality uint32) (opt Opts, respStatus int) {
 			return Opts{}, fasthttp.StatusBadRequest
 		}
 
-		quality = uint32(quality)
+		quality = uint32(qual)
 
 	} else {
 		quality = defaultQuality
@@ -62,9 +62,9 @@ func parseOpts(opts []byte, defaultQuality uint32) (opt Opts, respStatus int) {
 
 
 	return Opts{
-		width: uint32(width),
-		height: uint32(height),
-		quality: quality,
+		Width:   uint32(width),
+		Height:  uint32(height),
+		Quality: quality,
 	}, fasthttp.StatusOK
 
 }

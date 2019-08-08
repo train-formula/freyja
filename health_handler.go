@@ -1,4 +1,4 @@
-package freyja
+package main
 
 import "github.com/valyala/fasthttp"
 
