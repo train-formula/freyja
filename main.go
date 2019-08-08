@@ -1,8 +1,11 @@
 package freyja
 
 import (
+	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/valyala/fasthttp"
+	"os"
+	"runtime"
 )
 
 var RootCmd = &cobra.Command{
@@ -25,6 +28,10 @@ var ServerCmd = &cobra.Command{
 			//ReadBufferSize:                1 << 10,
 			//ReadTimeout:                   time.Second * 1,
 		}
+
+		fmt.Println(fastServer)
+
+		return nil
 	},
 }
 
@@ -36,4 +43,18 @@ func init() {
 	ServerCmd.Flags().StringP("unix", "u", "", "File path for unix socket (if not using HTTP port)")
 
 	RootCmd.AddCommand(ServerCmd)
+}
+
+
+func main() {
+
+	fmt.Println(runtime.NumCPU())
+	fmt.Println(os.LookupEnv("http_proxy"))
+	fmt.Println(os.LookupEnv("HTTP_PROXY"))
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
+	if err := RootCmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(-1)
+	}
 }
