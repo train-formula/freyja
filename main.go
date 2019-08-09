@@ -1,11 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"github.com/discordapp/lilliput"
+	"github.com/jolestar/go-commons-pool"
 	"github.com/spf13/cobra"
 	"github.com/valyala/fasthttp"
 	"os"
 	"runtime"
+	"strconv"
+	"sync/atomic"
+	"time"
 )
 
 var RootCmd = &cobra.Command{
@@ -14,12 +20,39 @@ var RootCmd = &cobra.Command{
 	},
 }
 
+var objectPoolConfig = &pool.ObjectPoolConfig{
+	LIFO:                     true,
+	MaxTotal:                 -1,
+	MaxIdle:                  100,
+	MinIdle:                  10,
+	MinEvictableIdleTime:     -1,
+	SoftMinEvictableIdleTime: time.Minute*30,
+	NumTestsPerEvictionRun:   100,
+	EvictionPolicyName:       pool.DefaultEvictionPolicyName,
+	EvitionContext:           context.Background(),
+	TestOnCreate:             false,
+	TestOnBorrow:             false,
+	TestOnReturn:             false,
+	TestWhileIdle:            false,
+	TimeBetweenEvictionRuns:  time.Second*10,
+	BlockWhenExhausted:       true}
+
 var ServerCmd = &cobra.Command{
 	Use: "server",
 	RunE: func(cmd *cobra.Command, args []string) error {
+
+
+		factory := pool.NewPooledObjectFactorySimple(
+			func(context.Context) (interface{}, error) {
+				return lilliput.NewImageOps(8192),
+					nil
+			})
+
+		objpool := pool.NewObjectPool(context.Background(), factory, objectPoolConfig)
+
 		fastServer := &fasthttp.Server{
 			Handler: fastHTTPHandler,
-			Name:    "apollo",
+			Name:    "freyja",
 			//Handler: s3APiHandler(Bucket),
 			GetOnly: true,
 			DisableHeaderNamesNormalizing: true,

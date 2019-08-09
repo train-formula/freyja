@@ -1,4 +1,4 @@
-package main
+package parse
 
 import (
 	"bytes"
@@ -20,7 +20,7 @@ var validSuffixs = [][]byte{
 
 var slashBytes = []byte("/")
 
-func parseURI (uri []byte, validBuckets [][]byte, defaultQuality uint32) (parsed ParsedURI, respStatus int) {
+func ParseURI (uri []byte, validBuckets [][]byte, defaultQuality uint32) (parsed ParsedURI, respStatus int) {
 
 	idxModifier := 0
 	if bytes.HasPrefix(uri, slashBytes) {

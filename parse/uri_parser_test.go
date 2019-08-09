@@ -1,4 +1,4 @@
-package main
+package parse
 
 import (
 	"bytes"
@@ -18,7 +18,7 @@ func Test_parseURI_noQualityOpts_parsesOK(t *testing.T) {
 
 	okBasicOptsWithSlash := []byte("/192x168/bucket1/Bucket/my/path.bmp.jpeg")
 
-	parsed, resp := parseURI(okBasicOptsWithSlash, testValidBuckets, defaultQuality)
+	parsed, resp := ParseURI(okBasicOptsWithSlash, testValidBuckets, defaultQuality)
 	if resp != fasthttp.StatusOK {
 		t.Errorf("Response code should be StatusOK")
 	}
