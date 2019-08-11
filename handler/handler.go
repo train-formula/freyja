@@ -2,14 +2,15 @@ package handler
 
 import (
 	"bytes"
-	"context"
+	"fmt"
 	"github.com/discordapp/lilliput"
-	"github.com/jolestar/go-commons-pool"
+	"github.com/train-formula/freyja/pool"
+
 	"github.com/train-formula/freyja/parse"
+	"github.com/valyala/bytebufferpool"
 	"github.com/valyala/fasthttp"
-	"io/ioutil"
+	"io"
 	"net/http"
-	"time"
 )
 
 var okS3Statuses = map[int]struct{}{
@@ -20,6 +21,12 @@ var okS3Statuses = map[int]struct{}{
 	206: struct{}{},
 }
 
+var notFoundS3Statuses = map[int]struct{}{
+	// Can indicates not found if the bucket itself is private
+	403: struct{}{},
+	404: struct{}{},
+}
+
 
 type Handler struct {
 	S3Host string
@@ -27,20 +34,7 @@ type Handler struct {
 	VarnishPort string
 	ValidBuckets [][]byte
 	DefaultQuality uint32
-	LilliputPool *pool.ObjectPool
-}
-
-func (h *Handler) getLilliputOps(ctx context.Context) (*lilliput.ImageOps, error) {
-	obj, err := h.LilliputPool.BorrowObject(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return obj.(*lilliput.ImageOps), nil
-}
-
-func (h *Handler) releaseLilliputOps(ctx context.Context, ops *lilliput.ImageOps) error {
-	return h.LilliputPool.ReturnObject(ctx, ops)
+	LilliputPool *pool.LilliputPool
 }
 
 func (h *Handler) Handle(ctx *fasthttp.RequestCtx) {
@@ -70,10 +64,8 @@ func (h *Handler) Handle(ctx *fasthttp.RequestCtx) {
 	var stdReq *http.Request
 	var stdReqErr error
 
-	//https://s3-us-west-2.amazonaws.com/formula-tester/Image.jpeg
-	s3Uri := []byte("formula-tester/Image.jpeg")
 	if h.NoVarnish {
-		stdReq, stdReqErr = http.NewRequest("GET", string(append([]byte("http://"+h.S3Host), s3Uri...)), nil)
+		stdReq, stdReqErr = http.NewRequest("GET", string(append([]byte("http://"+h.S3Host), parsed.S3Uri()...)), nil)
 	} else {
 		stdReq, stdReqErr = http.NewRequest("GET", string(append([]byte("http://localhost:"+h.VarnishPort), s3Uri...)), nil)
 	}
@@ -84,6 +76,8 @@ func (h *Handler) Handle(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+
+
 	stdReq.Header.Set("Host", h.S3Host)
 	stdReq.Host = h.S3Host
 
@@ -91,6 +85,7 @@ func (h *Handler) Handle(ctx *fasthttp.RequestCtx) {
 
 	if stdRespErr != nil || stdResp == nil || stdResp.Body == nil {
 
+		fmt.Println(stdRespErr)
 		if stdResp != nil && stdResp.Body != nil {
 			stdResp.Body.Close()
 		}
@@ -100,18 +95,28 @@ func (h *Handler) Handle(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	fmt.Println("OK 2")
+
 	s3Status := stdResp.StatusCode
+
+	fmt.Println(stdResp.ContentLength)
 
 	if _, statusOK := okS3Statuses[s3Status]; !statusOK {
 
-		h.errorHandler(ctx, s3Status, []byte("Error from S3"))
+		if _, statusNotFound := notFoundS3Statuses[s3Status]; statusNotFound {
+			h.errorHandler(ctx, s3Status, []byte("Image not found"))
+		} else {
+			h.errorHandler(ctx, s3Status, []byte("Error from S3"))
+		}
+
 
 		return
 
 	}
 
-	respBuf, respBufErr := ioutil.ReadAll(stdResp.Body)
-	if respBufErr != nil {
+	buf := bytebufferpool.Get()
+	_, err := io.Copy(buf, stdResp.Body)
+	if err != nil {
 		stdResp.Body.Close()
 
 		h.errorHandler(ctx, fasthttp.StatusInternalServerError, internalServerError)
@@ -127,15 +132,38 @@ func (h *Handler) Handle(ctx *fasthttp.RequestCtx) {
 		s3Etag = []byte(stdResp.Header.Get(etagHeaderString))
 	}
 
-	decoder, err := lilliput.NewDecoder(respBuf)
+	decoder, err := lilliput.NewDecoder(buf.Bytes())
 	if err != nil {
 		h.errorHandler(ctx, fasthttp.StatusInternalServerError, []byte("Error constructing image decoder"))
 		return
 	}
 
-	ops, err := h.getLilliputOps(ctx)
+	opsPair := h.LilliputPool.Get()
+
+	final, err := opsPair.Ops.Transform(decoder, &lilliput.ImageOptions{
+		FileType:".jpeg",
+		Width:int(parsed.Opts.Width),
+		Height:int(parsed.Opts.Height),
+		ResizeMethod:lilliput.ImageOpsFit,
+		NormalizeOrientation:false,
+		EncodeOptions: map[int]int{
+			lilliput.JpegProgressive: 1,
+			lilliput.JpegQuality: 100,
+		},
+
+	}, opsPair.Buf)
+
+	decoder.Close()
+	bytebufferpool.Put(buf)
+
 	if err != nil {
-		h.errorHandler(ctx, fasthttp.StatusInternalServerError, []byte("Error retrieving image operation from pool"))
+		fmt.Println(err)
+		h.errorHandler(ctx, fasthttp.StatusInternalServerError, []byte("Error transforming image"))
 		return
+
 	}
+
+	h.imageHandler(ctx, final, s3Etag)
+
+	h.LilliputPool.Put(opsPair)
 }

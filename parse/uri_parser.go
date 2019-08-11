@@ -12,6 +12,10 @@ type ParsedURI struct {
 	Opts       Opts
 }
 
+func (p *ParsedURI) S3Uri() []byte {
+	return append(slashBytes, append(p.Bucket, append(slashBytes, p.BucketPath...)...)...)
+}
+
 
 var validSuffixs = [][]byte{
 	[]byte(".jpeg"),
