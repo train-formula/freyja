@@ -2,9 +2,9 @@ package parse
 
 import (
 	"bytes"
+
 	"github.com/valyala/fasthttp"
 )
-
 
 type ParsedURI struct {
 	Bucket     []byte
@@ -16,7 +16,6 @@ func (p *ParsedURI) S3Uri() []byte {
 	return append(slashBytes, append(p.Bucket, append(slashBytes, p.BucketPath...)...)...)
 }
 
-
 var validSuffixs = [][]byte{
 	[]byte(".jpeg"),
 	[]byte(".jpg"),
@@ -24,7 +23,7 @@ var validSuffixs = [][]byte{
 
 var slashBytes = []byte("/")
 
-func ParseURI (uri []byte, validBuckets [][]byte, defaultQuality uint32) (parsed ParsedURI, respStatus int) {
+func ParseURI(uri []byte, validBuckets [][]byte, defaultQuality uint32) (parsed ParsedURI, respStatus int) {
 
 	idxModifier := 0
 	if bytes.HasPrefix(uri, slashBytes) {
@@ -39,11 +38,9 @@ func ParseURI (uri []byte, validBuckets [][]byte, defaultQuality uint32) (parsed
 		return ParsedURI{}, fasthttp.StatusBadRequest
 	}
 
-
 	opts := split[0+idxModifier]
 	bucket := split[1+idxModifier]
 	bucketPath := split[2+idxModifier]
-
 
 	if len(validBuckets) == 0 {
 		return ParsedURI{}, fasthttp.StatusBadRequest
@@ -57,6 +54,7 @@ func ParseURI (uri []byte, validBuckets [][]byte, defaultQuality uint32) (parsed
 
 	for _, vs := range validSuffixs {
 		if bytes.HasSuffix(bucketPath, vs) {
+			bucketPath = bucketPath[:len(bucketPath)-len(vs)]
 			validSuffix = true
 			break
 		}
@@ -80,12 +78,10 @@ func ParseURI (uri []byte, validBuckets [][]byte, defaultQuality uint32) (parsed
 		return ParsedURI{}, fasthttp.StatusBadRequest
 	}
 
-
 	parsedOpts, resp := parseOpts(opts, defaultQuality)
 	if resp != fasthttp.StatusOK {
 		return ParsedURI{}, resp
 	}
-
 
 	return ParsedURI{
 		Bucket:     bucket,
